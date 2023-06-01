@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.7.0   MAIN                                                              05/28/2023 20:59:29 PAGE 1   
+C51 COMPILER V9.60.7.0   MAIN                                                              06/01/2023 15:55:57 PAGE 1   
 
 
 C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
@@ -8,207 +8,205 @@ COMPILER INVOKED BY: C:\Keil_C51\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE
 
 line level    source
 
-   1          #include<reg52.h>
-   2          
-   3          #define uchar unsigned char
-   4          #define uint unsigned int
-   5          
-   6          uchar code Tab0[]=    //定义数码管数组，没有小数点
-   7          {
-   8            0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f
-   9          };
-  10          uchar code Tab1[]=    //定义数码管数组，有小数点
-  11          { 
-  12            0xbf,0x86,0xdb,0xcf,0xe6,0xed,0xfd,0x87,0xff,0xef
-  13          };
-  14          
-  15          sbit K1=P3^2;     //
-  16          sbit K2=P3^3;     //
-  17          sbit K3=P3^4;     //
-  18          
+   1          #include <reg52.h>
+   2          #include <stdio.h>
+   3          
+   4          
+   5          #define LCD_DATA_PORT P2
+   6          #define TIMER0_RELOAD_VALUE 65536 - (12000000 / 12 / 100) // 为10ms计算重载值
+   7          
+   8          sbit RS = P1^0;
+   9          sbit RW = P1^1;
+  10          sbit EN = P1^2;
+  11          sbit StaStoBon = P3^3;
+  12          sbit RestBon = P3^4;
+  13          sbit CounBon = P3^2;
+  14          unsigned char counter = 0;
+  15          unsigned int ms_elapsed = 0;
+  16          unsigned int seconds = 0;
+  17          unsigned int minutes = 0;
+  18          unsigned int hours = 0;
   19          
-  20          void Display1();    //秒表显示函数
-  21          void Init();      //中断初始化函数
-  22          void KEY_MiaoBiao();  //检测秒表操作按键
-  23          void KEY_Time_Set();  //检测时间设置按键
-  24          void delay_ms(unsigned int ms);
-  25          
-  26          
-  27          typedef struct
-  28          {
-  29            uchar Miao_Biao0;
-  30            uchar Miao_Biao1;
-  31            uchar Miao_Biao2;
-  32            uchar Miao_Biao3;
-  33            uchar Miao_Biao4;
+  20          unsigned int lap[3][4] = { 0 };
+  21          
+  22          void delay_ms(unsigned int ms)
+  23          {
+  24   1          unsigned int i, j;
+  25   1      
+  26   1          for(i = 0; i < ms; i++)
+  27   1          {
+  28   2              for(j = 0; j < 1000; j++) 
+  29   2              {
+  30   3                  // 空循环，什么也不做
+  31   3              }
+  32   2          }
+  33   1      }
   34          
-  35          }MIAOBIAO;
-  36          
-  37          MIAOBIAO MiaoBiao;
-  38          void main()
-  39          {
-  40   1        Init();                   //中断初始化
-  41   1        while(1)                  //死循环
-  42   1          {
-  43   2            
-  44   2            Display1();     //显示秒表
-  45   2            KEY_MiaoBiao();   //扫描秒表操作
-  46   2                    
-  47   2          }
-  48   1      }
-  49          
-  50          void KEY_MiaoBiao()               //检测秒表按键操作
-  51          {
-  52   1        
-  53   1        if(K2==0)
-  54   1        {
-C51 COMPILER V9.60.7.0   MAIN                                                              05/28/2023 20:59:29 PAGE 2   
+  35          void lcd_write_command(unsigned char command) {
+  36   1          RS = 0;
+  37   1          RW = 0;
+  38   1          LCD_DATA_PORT = command;
+  39   1          EN = 1;
+  40   1          delay_ms(1);
+  41   1          EN = 0;
+  42   1          delay_ms(1);
+  43   1      }
+  44          
+  45          void lcd_write_data(unsigned char data1) {
+  46   1          RS = 1;
+  47   1          RW = 0;
+  48   1          LCD_DATA_PORT = data1;
+  49   1          EN = 1;
+  50   1          delay_ms(1);
+  51   1          EN = 0;
+  52   1          delay_ms(1);
+  53   1      }
+  54          
+C51 COMPILER V9.60.7.0   MAIN                                                              06/01/2023 15:55:57 PAGE 2   
 
-  55   2          delay_ms(10);
-  56   2          if(K2==0)
-  57   2          {
-  58   3            TR0=~TR0;     //K2每按一次TR1取反，暂停或开始定时器1，达到暂停或开始秒表的目�
-             -�
-  59   3            while(!K2);
-  60   3          }
-  61   2        }
-  62   1        if(K3==0)
-  63   1        {
-  64   2          delay_ms(10);
-  65   2          if(K3==0)         //当K3按下时秒表所有数据清零，并停止定时器1
-  66   2          {
-  67   3            if(TR0 == 0)  //只有在跑秒停止时才可以清零
-  68   3            {
-  69   4              TR0=0;        //停止定时器1
-  70   4              MiaoBiao.Miao_Biao0=0;    //清零数据
-  71   4              MiaoBiao.Miao_Biao1=0;
-  72   4              MiaoBiao.Miao_Biao2=0;
-  73   4              MiaoBiao.Miao_Biao3=0;
-  74   4              MiaoBiao.Miao_Biao4=0;
-  75   4              while(!K3);
-  76   4            }
-  77   3          }
-  78   2        }
-  79   1        if(K1==0)
-  80   1        {
-  81   2          delay_ms(10);
-  82   2          if(K1==0)
-  83   2          {
-  84   3            if(TR1 == 0)    //停止跑秒时翻看计次记录
-  85   3            {
-  86   4                      
-  87   4            }
-  88   3            else            //跑秒时计次
-  89   3            {
-  90   4                    
-  91   4            }
-  92   3          }
-  93   2                  
-  94   2        }
-  95   1          
-  96   1      }
-  97          
-  98          
-  99            
- 100          
- 101          void Time1() interrupt 1        //定时器1函数
- 102          {
- 103   1        TH0 = 0xFC;  // 设置定时器初值
- 104   1        TL0 = 0x18;
- 105   1      
- 106   1        MiaoBiao.Miao_Biao0++;
- 107   1        if(MiaoBiao.Miao_Biao0==100)        //以下为秒表数据处理
- 108   1          {
- 109   2            MiaoBiao.Miao_Biao0=0;
- 110   2            MiaoBiao.Miao_Biao1++;      //Miao_Biao1每加1次为100ms，
- 111   2            if(MiaoBiao.Miao_Biao1==10)
- 112   2              {
- 113   3                MiaoBiao.Miao_Biao1=0;
- 114   3                MiaoBiao.Miao_Biao2++;
- 115   3                if(MiaoBiao.Miao_Biao2==60) 
-C51 COMPILER V9.60.7.0   MAIN                                                              05/28/2023 20:59:29 PAGE 3   
+  55          void lcd_init() {
+  56   1          delay_ms(15);
+  57   1          lcd_write_command(0x38); // 设置为16x4显示模式，8位数据总线，2行显示，5x8点阵字�
+             -�
+  58   1          lcd_write_command(0x0c); // 开启显示，关闭光标和光标闪烁
+  59   1          lcd_write_command(0x06); // 光标右移，字符不移动
+  60   1          lcd_write_command(0x01); // 清屏
+  61   1      }
+  62          
+  63          void lcd_clear() {
+  64   1          lcd_write_command(0x01);
+  65   1      }
+  66          
+  67          void lcd_set_cursor(unsigned char row, unsigned char col) {  //设置光标位置
+  68   1          unsigned char address;
+  69   1          if (row == 0) {
+  70   2              address = col;
+  71   2          } else if (row == 1) {
+  72   2              address = col + 0x40;
+  73   2          } else if (row == 2) {
+  74   2              address = col + 0x10;
+  75   2          } else { // row == 3
+  76   2              address = col + 0x50;
+  77   2          }
+  78   1          lcd_write_command(0x80 | address);
+  79   1      }
+  80          
+  81          void lcd_write_string(char *str) {
+  82   1          while (*str) {
+  83   2              lcd_write_data(*str++);
+  84   2          }
+  85   1      }
+  86          
+  87          void timer0_init() {
+  88   1        TMOD |= 0x01; // 设置定时器0为模式1（16位定时器/计数器）
+  89   1          TH0 = (TIMER0_RELOAD_VALUE >> 8) & 0xFF; // 设置高字节重载值
+  90   1          TL0 = TIMER0_RELOAD_VALUE & 0xFF; // 设置低字节重载值
+  91   1          ET0 = 1; // 使能定时器0中断
+  92   1          TR0 = 0; // 启动定时器0
+  93   1        EA=1;
+  94   1        
+  95   1      } 
+  96          
+  97          void timer0_isr() interrupt 1{
+  98   1          TH0 = (TIMER0_RELOAD_VALUE >> 8) & 0xFF; // 重新设置高字节重载值
+  99   1          TL0 = TIMER0_RELOAD_VALUE & 0xFF; // 重新设置低字节重载值
+ 100   1          ms_elapsed++;
+ 101   1          if(ms_elapsed == 100){
+ 102   2            ms_elapsed = 0;       
+ 103   2            seconds++;
+ 104   2            if(seconds == 60){
+ 105   3              seconds = 0;
+ 106   3              minutes++;
+ 107   3              if(minutes == 60){
+ 108   4                minutes = 0;
+ 109   4                hours++;
+ 110   4              }
+ 111   3            }
+ 112   2          }
+ 113   1        
+ 114   1      }
+ 115            
+C51 COMPILER V9.60.7.0   MAIN                                                              06/01/2023 15:55:57 PAGE 3   
 
- 116   3                  {
- 117   4                    MiaoBiao.Miao_Biao2=0;
- 118   4                    MiaoBiao.Miao_Biao3++;
- 119   4                    if(MiaoBiao.Miao_Biao3==60)
- 120   4                      {
- 121   5                        MiaoBiao.Miao_Biao3=0;
- 122   5                        MiaoBiao.Miao_Biao4++;
- 123   5                        if(MiaoBiao.Miao_Biao4==10)
- 124   5                          MiaoBiao.Miao_Biao4=0;
- 125   5                      }
- 126   4                  }
- 127   3              }
- 128   2          }
- 129   1      }
- 130          
- 131          void Init()             //中断初始化函数
- 132          {
- 133   1        TMOD |= 0x01;   // 定时器0工作在模式1：16位自动重载计数模式
- 134   1        TH0 = 0xFC;     // 设置定时器初值，计算公式：65535-4500+1=0xFC18
- 135   1        TL0 = 0x18;     // 时钟周期为1/11.0592MHz ≈ 90.5ns，计时4500个时钟周期等于1ms
- 136   1        ET0 = 1;        // 开启定时器0中断
- 137   1        TR0 = 0;        // 启动定时器0
- 138   1        EA = 1;         // 开启总中断
- 139   1      }
- 140          
- 141          
- 142          void Display1()     //显示秒表
- 143          {
- 144   1        P0=Tab0[MiaoBiao.Miao_Biao1%10];    //显示1/10秒的个位
- 145   1        P1=0xdf;          //段选
- 146   1        delay_ms(1);          //延时
- 147   1        P0=0X00;          //消隐
- 148   1      
- 149   1        P0=Tab1[MiaoBiao.Miao_Biao2%10];    //显示秒的个位，需要加上小数点做分隔符
- 150   1        P1=0xef;          //段选
- 151   1        delay_ms(1);          //延时
- 152   1        P0=0X00;          //消隐
- 153   1      
- 154   1        P0=Tab0[MiaoBiao.Miao_Biao2/10];    //显示秒的十位
- 155   1        P1=0xf7;          //段选
- 156   1        delay_ms(1);          //延时
- 157   1        P0=0X00;          //消隐
- 158   1      
- 159   1        P0=Tab1[MiaoBiao.Miao_Biao3%10];    //显示分的个位，需要加上小数点做分隔符
- 160   1        P1=0xfb;          //段选
- 161   1        delay_ms(1);          //延时
- 162   1        P0=0X00;          //消隐
- 163   1      
- 164   1        P0=Tab0[MiaoBiao.Miao_Biao3/10];    //显示分的十位
- 165   1        P1=0xfd;          //段选
- 166   1        delay_ms(1);          //延时
- 167   1        P0=0X00;          //消隐
- 168   1      
- 169   1        P0=Tab1[MiaoBiao.Miao_Biao4%10];    //显示时的个位，需要加上小数点做分隔符
- 170   1        P1=0xfe;          //段选
- 171   1        delay_ms(1);          //延时
- 172   1        P0=0X00;          //消隐
- 173   1      }
- 174          
+ 116             
+ 117          
+ 118          
+ 119          
+ 120          unsigned char i, j;
+ 121          void key_scan_task(){
+ 122   1        if (StaStoBon == 0) { // Start/Stop button
+ 123   2          TR0 = !TR0;
+ 124   2          while (StaStoBon == 0);
+ 125   2        }
+ 126   1        if (RestBon == 0) { // Reset button
+ 127   2          counter = ms_elapsed = seconds = minutes = hours = 0; //秒表清零
+ 128   2          for (i = 0; i < 3; i++) {                             //计次清零
+ 129   3            for (j = 0; j < 4; j++) {
+ 130   4              lap[i][j] = 0;
+ 131   4            }
+ 132   3          }
+ 133   2          while (RestBon == 0);
+ 134   2        }
+ 135   1        if (CounBon == 0) { // Lap button
+ 136   2          if(counter < 3){
+ 137   3            if(TR0)         //停止跑秒不记次
+ 138   3            {
+ 139   4              lap[counter][0] = hours;
+ 140   4              lap[counter][1] = minutes;
+ 141   4              lap[counter][2] = seconds;
+ 142   4              lap[counter][3] = ms_elapsed;
+ 143   4              counter++;
+ 144   4            }
+ 145   3            
+ 146   3          }
+ 147   2          
+ 148   2          
+ 149   2          while (CounBon == 0);
+ 150   2        }
+ 151   1      }
+ 152          
+ 153          void display_task(){
+ 154   1        
+ 155   1        char tempbuff[16];
+ 156   1        sprintf(tempbuff,"  %02d:%02d:%02d:%02d",hours,minutes,seconds,ms_elapsed);
+ 157   1        lcd_set_cursor(0, 0);
+ 158   1        lcd_write_string(tempbuff);
+ 159   1      }
+ 160          
+ 161          void display1_task(){
+ 162   1        
+ 163   1        char tempbuff[16];
+ 164   1        sprintf(tempbuff,"1 %02d:%02d:%02d:%02d",lap[0][0],lap[0][1],lap[0][2],lap[0][3]);
+ 165   1        lcd_set_cursor(1, 0);
+ 166   1        lcd_write_string(tempbuff);
+ 167   1        sprintf(tempbuff,"2 %02d:%02d:%02d:%02d",lap[1][0],lap[1][1],lap[1][2],lap[1][3]);
+ 168   1        lcd_set_cursor(2, 0);
+ 169   1        lcd_write_string(tempbuff);
+ 170   1        sprintf(tempbuff,"3 %02d:%02d:%02d:%02d",lap[2][0],lap[2][1],lap[2][2],lap[2][3]);
+ 171   1        lcd_set_cursor(3, 0);
+ 172   1        lcd_write_string(tempbuff);
+ 173   1      
+ 174   1      }
  175          
- 176          void delay_ms(unsigned int ms)  // 延时函数
- 177          {
-C51 COMPILER V9.60.7.0   MAIN                                                              05/28/2023 20:59:29 PAGE 4   
+ 176          void main() {
+ 177   1          timer0_init();
+C51 COMPILER V9.60.7.0   MAIN                                                              06/01/2023 15:55:57 PAGE 4   
 
- 178   1        unsigned char i, j;
- 179   1        while (ms--)
- 180   1        {
- 181   2          for (i = 0; i < 12; i++)
- 182   2          {
- 183   3            for (j = 0; j < 250; j++);
- 184   3           }
- 185   2        }
- 186   1      }
+ 178   1          lcd_init();
+ 179   1        while(1){
+ 180   2          display_task();
+ 181   2          display1_task();
+ 182   2          key_scan_task();
+ 183   2        }
+ 184   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    320    ----
-   CONSTANT SIZE    =     20    ----
+   CODE SIZE        =    638    ----
+   CONSTANT SIZE    =     88    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =      5    ----
+   DATA SIZE        =     35      35
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
 END OF MODULE INFORMATION.

@@ -1,186 +1,184 @@
-#include<reg52.h>
+#include <reg52.h>
+#include <stdio.h>
 
-#define uchar unsigned char
-#define uint unsigned int
 
-uchar code Tab0[]=		//定义数码管数组，没有小数点
+#define LCD_DATA_PORT P2
+#define TIMER0_RELOAD_VALUE 65536 - (12000000 / 12 / 100) // 为10ms计算重载值
+
+sbit RS = P1^0;
+sbit RW = P1^1;
+sbit EN = P1^2;
+sbit StaStoBon = P3^3;
+sbit RestBon = P3^4;
+sbit CounBon = P3^2;
+unsigned char counter = 0;
+unsigned int ms_elapsed = 0;
+unsigned int seconds = 0;
+unsigned int minutes = 0;
+unsigned int hours = 0;
+
+unsigned int lap[3][4] = { 0 };
+
+void delay_ms(unsigned int ms)
 {
-	0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f
-};
-uchar code Tab1[]=		//定义数码管数组，有小数点
-{	
-	0xbf,0x86,0xdb,0xcf,0xe6,0xed,0xfd,0x87,0xff,0xef
-};
+    unsigned int i, j;
 
-sbit K1=P3^2;			//
-sbit K2=P3^3;			//
-sbit K3=P3^4;			//
-
-
-void Display1(); 		//秒表显示函数
-void Init(); 			//中断初始化函数
-void KEY_MiaoBiao();	//检测秒表操作按键
-void KEY_Time_Set();	//检测时间设置按键
-void delay_ms(unsigned int ms);
-
-
-typedef struct
-{
-	uchar Miao_Biao0;
-	uchar Miao_Biao1;
-	uchar Miao_Biao2;
-	uchar Miao_Biao3;
-	uchar Miao_Biao4;
-
-}MIAOBIAO;
-
-MIAOBIAO MiaoBiao;
-void main()
-{
-	Init();										//中断初始化
-	while(1)									//死循环
-		{
-			
-			Display1();	 		//显示秒表
-			KEY_MiaoBiao();		//扫描秒表操作
-							
-		}
-}
-
-void KEY_MiaoBiao()								//检测秒表按键操作
-{
-	
-	if(K2==0)
-	{
-		delay_ms(10);
-		if(K2==0)
-		{
-			TR0=~TR0;			//K2每按一次TR1取反，暂停或开始定时器1，达到暂停或开始秒表的目的
-			while(!K2);
-		}
-	}
-	if(K3==0)
-	{
-		delay_ms(10);
-		if(K3==0)	 				//当K3按下时秒表所有数据清零，并停止定时器1
-		{
-			if(TR0 == 0)	//只有在跑秒停止时才可以清零
-			{
-				TR0=0;	 			//停止定时器1
-				MiaoBiao.Miao_Biao0=0; 		//清零数据
-				MiaoBiao.Miao_Biao1=0;
-				MiaoBiao.Miao_Biao2=0;
-				MiaoBiao.Miao_Biao3=0;
-				MiaoBiao.Miao_Biao4=0;
-				while(!K3);
-			}
-		}
-	}
-	if(K1==0)
-	{
-		delay_ms(10);
-		if(K1==0)
-		{
-			if(TR1 == 0)		//停止跑秒时翻看计次记录
-			{
-								
-			}
-			else						//跑秒时计次
-			{
-							
-			}
-		}
-						
-	}
-		
-}
-
-
-	
-
-void Time1() interrupt 1  			//定时器1函数
-{
-	TH0 = 0xFC;  // 设置定时器初值
-  TL0 = 0x18;
-
-	MiaoBiao.Miao_Biao0++;
-	if(MiaoBiao.Miao_Biao0==100)				//以下为秒表数据处理
-		{
-			MiaoBiao.Miao_Biao0=0;
-			MiaoBiao.Miao_Biao1++;	 		//Miao_Biao1每加1次为100ms，
-			if(MiaoBiao.Miao_Biao1==10)
-				{
-					MiaoBiao.Miao_Biao1=0;
-					MiaoBiao.Miao_Biao2++;
-					if(MiaoBiao.Miao_Biao2==60)	
-						{
-							MiaoBiao.Miao_Biao2=0;
-							MiaoBiao.Miao_Biao3++;
-							if(MiaoBiao.Miao_Biao3==60)
-								{
-									MiaoBiao.Miao_Biao3=0;
-									MiaoBiao.Miao_Biao4++;
-									if(MiaoBiao.Miao_Biao4==10)
-										MiaoBiao.Miao_Biao4=0;
-								}
-						}
-				}
-		}
-}
-
-void Init()	 						//中断初始化函数
-{
-	TMOD |= 0x01;   // 定时器0工作在模式1：16位自动重载计数模式
-  TH0 = 0xFC;     // 设置定时器初值，计算公式：65535-4500+1=0xFC18
-  TL0 = 0x18;     // 时钟周期为1/11.0592MHz ≈ 90.5ns，计时4500个时钟周期等于1ms
-  ET0 = 1;        // 开启定时器0中断
-  TR0 = 0;        // 启动定时器0
-  EA = 1;         // 开启总中断
-}
-
-
-void Display1()			//显示秒表
-{
-	P0=Tab0[MiaoBiao.Miao_Biao1%10];		//显示1/10秒的个位
-	P1=0xdf;					//段选
-	delay_ms(1);					//延时
-	P0=0X00;					//消隐
-
-	P0=Tab1[MiaoBiao.Miao_Biao2%10];		//显示秒的个位，需要加上小数点做分隔符
-	P1=0xef;					//段选
-	delay_ms(1);					//延时
-	P0=0X00;					//消隐
-
-	P0=Tab0[MiaoBiao.Miao_Biao2/10];		//显示秒的十位
-	P1=0xf7;					//段选
-	delay_ms(1);					//延时
-	P0=0X00;					//消隐
-
-	P0=Tab1[MiaoBiao.Miao_Biao3%10];		//显示分的个位，需要加上小数点做分隔符
-	P1=0xfb;					//段选
-	delay_ms(1);					//延时
-	P0=0X00;					//消隐
-
-	P0=Tab0[MiaoBiao.Miao_Biao3/10];		//显示分的十位
-	P1=0xfd;					//段选
-	delay_ms(1);					//延时
-	P0=0X00;					//消隐
-
-	P0=Tab1[MiaoBiao.Miao_Biao4%10];		//显示时的个位，需要加上小数点做分隔符
-	P1=0xfe;					//段选
-	delay_ms(1);					//延时
-	P0=0X00;					//消隐
-}
-
-
-void delay_ms(unsigned int ms)  // 延时函数
-{
-  unsigned char i, j;
-  while (ms--)
-  {
-    for (i = 0; i < 12; i++)
+    for(i = 0; i < ms; i++)
     {
-      for (j = 0; j < 250; j++);
-     }
+        for(j = 0; j < 1000; j++) 
+        {
+            // 空循环，什么也不做
+        }
+    }
+}
+
+void lcd_write_command(unsigned char command) {
+    RS = 0;
+    RW = 0;
+    LCD_DATA_PORT = command;
+    EN = 1;
+    delay_ms(1);
+    EN = 0;
+    delay_ms(1);
+}
+
+void lcd_write_data(unsigned char data1) {
+    RS = 1;
+    RW = 0;
+    LCD_DATA_PORT = data1;
+    EN = 1;
+    delay_ms(1);
+    EN = 0;
+    delay_ms(1);
+}
+
+void lcd_init() {
+    delay_ms(15);
+    lcd_write_command(0x38); // 设置为16x4显示模式，8位数据总线，2行显示，5x8点阵字符
+    lcd_write_command(0x0c); // 开启显示，关闭光标和光标闪烁
+    lcd_write_command(0x06); // 光标右移，字符不移动
+    lcd_write_command(0x01); // 清屏
+}
+
+void lcd_clear() {
+    lcd_write_command(0x01);
+}
+
+void lcd_set_cursor(unsigned char row, unsigned char col) {  //设置光标位置
+    unsigned char address;
+    if (row == 0) {
+        address = col;
+    } else if (row == 1) {
+        address = col + 0x40;
+    } else if (row == 2) {
+        address = col + 0x10;
+    } else { // row == 3
+        address = col + 0x50;
+    }
+    lcd_write_command(0x80 | address);
+}
+
+void lcd_write_string(char *str) {
+    while (*str) {
+        lcd_write_data(*str++);
+    }
+}
+
+void timer0_init() {
+	TMOD |= 0x01; // 设置定时器0为模式1（16位定时器/计数器）
+    TH0 = (TIMER0_RELOAD_VALUE >> 8) & 0xFF; // 设置高字节重载值
+    TL0 = TIMER0_RELOAD_VALUE & 0xFF; // 设置低字节重载值
+    ET0 = 1; // 使能定时器0中断
+    TR0 = 0; // 启动定时器0
+	EA=1;
+	
+} 
+
+void timer0_isr() interrupt 1{
+		TH0 = (TIMER0_RELOAD_VALUE >> 8) & 0xFF; // 重新设置高字节重载值
+    TL0 = TIMER0_RELOAD_VALUE & 0xFF; // 重新设置低字节重载值
+		ms_elapsed++;
+		if(ms_elapsed == 100){
+			ms_elapsed = 0;				
+			seconds++;
+			if(seconds == 60){
+				seconds = 0;
+				minutes++;
+				if(minutes == 60){
+					minutes = 0;
+					hours++;
+				}
+			}
+		}
+	
+}
+	
+   
+
+
+
+unsigned char i, j;
+void key_scan_task(){
+	if (StaStoBon == 0) { // Start/Stop button
+		TR0 = !TR0;
+    while (StaStoBon == 0);
   }
+  if (RestBon == 0) { // Reset button
+    counter = ms_elapsed = seconds = minutes = hours = 0; //秒表清零
+		for (i = 0; i < 3; i++) {                             //计次清零
+			for (j = 0; j < 4; j++) {
+        lap[i][j] = 0;
+			}
+		}
+    while (RestBon == 0);
+  }
+  if (CounBon == 0) { // Lap button
+		if(counter < 3){
+			if(TR0)         //停止跑秒不记次
+			{
+				lap[counter][0] = hours;
+				lap[counter][1] = minutes;
+				lap[counter][2] = seconds;
+				lap[counter][3] = ms_elapsed;
+				counter++;
+			}
+			
+		}
+		
+		
+    while (CounBon == 0);
+  }
+}
+
+void display_task(){
+	
+	char tempbuff[16];
+	sprintf(tempbuff,"  %02d:%02d:%02d:%02d",hours,minutes,seconds,ms_elapsed);
+	lcd_set_cursor(0, 0);
+	lcd_write_string(tempbuff);
+}
+
+void display1_task(){
+	
+	char tempbuff[16];
+	sprintf(tempbuff,"1 %02d:%02d:%02d:%02d",lap[0][0],lap[0][1],lap[0][2],lap[0][3]);
+	lcd_set_cursor(1, 0);
+	lcd_write_string(tempbuff);
+	sprintf(tempbuff,"2 %02d:%02d:%02d:%02d",lap[1][0],lap[1][1],lap[1][2],lap[1][3]);
+	lcd_set_cursor(2, 0);
+	lcd_write_string(tempbuff);
+	sprintf(tempbuff,"3 %02d:%02d:%02d:%02d",lap[2][0],lap[2][1],lap[2][2],lap[2][3]);
+	lcd_set_cursor(3, 0);
+	lcd_write_string(tempbuff);
+
+}
+
+void main() {
+		timer0_init();
+    lcd_init();
+	while(1){
+		display_task();
+		display1_task();
+		key_scan_task();
+	}
 }
